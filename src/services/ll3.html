@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+<form action="">
+    <input type="file" name="file" id="csvFile">
+    <input type="submit" value="Submit" id="submitForm">
+</form>
+<canvas id="polarAreaChart" width="1000" height="800"></canvas>
+<canvas id="horizontalBarChart" width="1500" height="900"></canvas>
+
+
+</body>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+
+    const data = [];
+    var centerRegionData = [];
+    var numDataPoints;
+    var labels;
+    var values;
+    var maxDataValue;
+    var regionData = [];
+    var numRegions;
+    var numMonths;
+    var regionColors;
+    var maxDataValue2;
+    var len;
+    var dlen;
+    var data2 = [];
+    const csvFile = document.getElementById('csvFile');
+    const submitForm = document.getElementById('submitForm');
+    submitForm.addEventListener('click', (e) => {
+        e.preventDefault();
+        const file = csvFile.files[0];
+        const reader = new FileReader();
+        reader.readAsText(file);
+        reader.onload = () => {
+            const result = reader.result;
+            const lines = result.split('\n');
+            const headers = lines[0].split(';');
+
+            for (let i = 1; i < lines.length; i++) {
+                const currentLine = lines[i].trim();
+                if (currentLine === '') {
+                    continue;
+                }
+
+                const obj = {};
+                const currentData = currentLine.split(';');
+                for (let j = 0; j < headers.length; j++) {
+                    obj[headers[j]] = currentData[j];
+                }
+                data.push(obj);
+            }
+
+            console.log(data);
+
+            centerRegionData = data.find(item => item.Regiunea === 'CENTRU');
+            console.log(centerRegionData);
+            const centerRegionDataArray = [];
+            for (const [key, value] of Object.entries(centerRegionData)) {
+                if (key !== 'Regiunea' && key !== 'Anul') {
+                    centerRegionDataArray.push({
+                        month: key,
+                        value: value
+                    });
+                }
+            }
+            console.log(centerRegionDataArray);
+            labels = centerRegionDataArray.map(item => item.month);
+            values = centerRegionDataArray.map(item => item.value);
+            values2 =
+                numDataPoints = values.length;
+            maxDataValue = Math.max(...values);
+            regionData = data.slice(0);
+            numRegions = regionData.length;
+            numMonths = labels.length;
+            len = data[0].Regiunea.length;
+            dlen = data.length;
+            console.log(data.length);
+            regionColors = regionData.map(() => getRandomColor()); // Calculate the maximum data value for scaling
+            maxDataValue2 = Math.max(...data.map(region => Math.max(...Object.values(region).slice(1))));
+
+            // console.log(labels);
+            // console.log(values);
+            // console.log(numDataPoints);
+            // console.log(maxDataValue);
+            // console.log(regionData);
+            // console.log(numRegions);
+            // console.log(numMonths);
+            // console.log(regionColors);
+
+            drawPolarAreaChart();
+            drawHorizontalBarChart(data);
+
+        };
+    });
+
+    const canvas = document.getElementById('polarAreaChart');
+    const ctx = canvas.getContext('2d');
+
+    const center = {
+        x: canvas.width / 2,
+        y: canvas.height / 2
+    };
+
+    const radius = Math.min(center.x, center.y) * 0.9;
+
+
+    function drawPolarAreaChart() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const angleStep = (Math.PI * 2) / numDataPoints;
+        const totalSum = values.reduce((sum, value) => sum + value, 0);
+        //Math.ceil rotungeste inainte la cel mai mic intreg
+        const numRings = Math.ceil(maxDataValue / 10);for (let ring = 1; ring <= numRings; ring++) {
+            const scaleValue = ring * 10;
+            const scaleRadius = (radius * scaleValue) / maxDataValue2;
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, scaleRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'gray';
+            ctx.stroke();
+
+            const scaleText = scaleValue.toString();
+            console.log(scaleText);
+            ctx.fillStyle = 'black';
+            ctx.font = '12px Arial';
+            const textX = center.x + scaleRadius * Math.cos(Math.PI * 2);//cos(2pi) = 1
+            const textY = center.y - scaleRadius * Math.sin(Math.PI * 2);//cos(2pi) = 0
+            ctx.fillText(scaleText, textX, textY);
+        }
+
+        let currentAngle = -Math.PI / 2;
+
+        console.log('num data points', numDataPoints);
+        for (let i = 0; i < numDataPoints; i++) {
+
+            const angle = currentAngle + angleStep;
+            const sectionSize = (values[i] / maxDataValue2) * radius;
+
+            //de aici deplasam valoareaa in sus/in jos
+            const textAngle = currentAngle + angleStep / 2;
+            console.log('text angle', textAngle);
+            //de aici deplasam sau apropiem valoarea de centru
+            const textRadius = (sectionSize + radius) / 3;
+            console.log('text radius', textRadius);
+            const textX = center.x + Math.cos(textAngle) * textRadius;
+            const textY = center.y + Math.sin(textAngle) * textRadius;
+
+            ctx.beginPath();
+            ctx.moveTo(center.x, center.y);
+            ctx.arc(center.x, center.y, sectionSize, currentAngle, angle);
+            ctx.closePath();
+            // ctx.fillStyle = regionColors[i];
+            ctx.fillStyle = getRandomColor();
+            ctx.fill();
+            //culoarea conturului sectiunii
+            ctx.strokeStyle = 'white';
+            ctx.stroke();
+            //culoarea textului
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.fillText(values[i], textX, textY);
+            currentAngle = angle;
+        }
+
+        ctx.fillStyle = 'black';
+        ctx.font = '12px Arial';
+        for (let i = 0; i < numDataPoints; i++) {
+            const angle = currentAngle + angleStep / 2;
+            const x = center.x + Math.cos(angle) * (radius + 20);
+            const y = center.y + Math.sin(angle) * (radius + 20);
+            ctx.fillText(labels[i], x, y);
+            currentAngle += angleStep;
+        }
+    }
+    const barCanvas = document.getElementById('horizontalBarChart');
+    const barCtx = barCanvas.getContext('2d');
+    const axisHeight = 150;
+
+    function drawHorizontalBarChart() {
+        barCtx.clearRect(0, 0, barCanvas.width, barCanvas.height);
+        const barSpacing = 0;
+        const groupSpacing = 55;
+        const barHeight = 10;
+        const maxBarWidth = barCanvas.width - axisHeight;
+        const scaleFactor = maxBarWidth / maxDataValue;
+
+        for (let j = 0; j < numMonths; j++) {
+            const groupY = 50 + j * (barHeight * 6.9 + groupSpacing / 1.5);
+            const regionLabel = labels[j];
+            barCtx.fillStyle = 'black';
+            barCtx.font = '12px Arial';
+            barCtx.textAlign = 'right';
+            barCtx.textBaseline = 'middle';
+            const y = groupY + (groupSpacing / 2);
+            console.log(regionLabel);
+            barCtx.fillText(regionLabel, axisHeight - 10, y);
+        }
+
+        const numBars = numRegions * numMonths;
+        const totalBarHeight = numBars * barHeight + (numMonths - 1) * groupSpacing;
+        const yOffset = (barCanvas.height - totalBarHeight) / 2;for (let i = 0; i < numMonths; i++) {
+            const groupY = yOffset + i * (numRegions * (barHeight + barSpacing) + groupSpacing);
+            for (let j = 0; j < numRegions; j++) {
+                const value = parseFloat(regionData[j][labels[i]]);
+                const barWidth = value * scaleFactor;
+                const y = groupY + j * (barHeight + barSpacing);
+                const x = axisHeight;
+                const color = regionColors[j];
+                barCtx.fillStyle = color;
+                barCtx.fillRect(x, y, barWidth, barHeight);
+                barCtx.fillStyle = 'black';
+                barCtx.font = '12px Arial';
+                barCtx.textAlign = 'left';
+
+                barCtx.fillText(value, x + barWidth + 5, y + barHeight / 2);
+            }
+        }
+
+        barCtx.fillStyle = 'black';
+        barCtx.fillRect(axisHeight, barCanvas.height - 40, maxBarWidth, 2);
+
+        const arrowSize = 10;
+        barCtx.beginPath();
+        barCtx.moveTo(maxBarWidth + axisHeight - arrowSize, barCanvas.height - 40 - arrowSize);
+        barCtx.lineTo(maxBarWidth + axisHeight, barCanvas.height - 40);
+        barCtx.lineTo(maxBarWidth + axisHeight - arrowSize, barCanvas.height - 40 + arrowSize);
+        barCtx.closePath();
+        barCtx.fill();
+
+
+        for (let i = 0; i <= maxDataValue + 30; i += 20) {
+            const labelX = axisHeight + i * scaleFactor;
+            barCtx.fillText(i, labelX, barCanvas.height - 25);
+
+            if (i < maxDataValue) {
+                barCtx.beginPath();
+                barCtx.moveTo(labelX + 5, barCanvas.height - 40 - arrowSize);
+                barCtx.lineTo(labelX, barCanvas.height - 40);
+                barCtx.lineTo(labelX + 5, barCanvas.height - 40 + arrowSize);
+                barCtx.closePath();
+                barCtx.fill();
+            }
+        }
+
+        const legendSpacing = 160;
+        const legendWidth = 20;
+        const legendHeight = 10;
+        const legendTextOffset = 10;
+        const legendX = 400;
+        const legendY = barCanvas.height - 10;
+
+        for (let j = 0; j < numRegions; j++) {
+            const color = regionColors[j];
+            const regionName = regionData[j].Regiunea;
+            const legendElementX = legendX + j * (legendSpacing + legendWidth);
+            const legendElementY = legendY;
+
+            barCtx.fillStyle = color;
+            barCtx.fillRect(legendElementX, legendElementY, legendWidth, legendHeight);
+
+
+            barCtx.fillStyle = 'black';
+            barCtx.font = '12px Arial';
+            barCtx.textAlign = 'left';
+            barCtx.textBaseline = 'middle';
+            barCtx.fillText(regionName, legendElementX + legendWidth + legendTextOffset, legendElementY + legendHeight / 2);
+        }
+    }
+
+    function getRandomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var index = 0; index < 6; index++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+
+</script>
+
+</html>
